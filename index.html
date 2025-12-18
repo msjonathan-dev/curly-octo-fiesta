@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>My Stock Picks</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f4f9;
+      margin: 0;
+      padding: 0;
+      transition: background 0.3s, color 0.3s;
+    }
+
+    .container {
+      max-width: 600px;
+      margin: 50px auto;
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      transition: background 0.3s, color 0.3s;
+    }
+
+    h1 {
+      text-align: center;
+      color: #333;
+    }
+
+    form {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 20px;
+    }
+
+    input {
+      flex: 1;
+      padding: 10px;
+      margin-right: 10px;
+    }
+
+    button {
+      padding: 10px 15px;
+      background: #0077cc;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #005fa3;
+    }
+
+    ul {
+      list-style: none;
+      padding: 0;
+    }
+
+    li {
+      background: #eef;
+      margin: 5px 0;
+      padding: 10px;
+      border-radius: 4px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: background 0.3s, color 0.3s;
+    }
+
+    .stock-info {
+      flex: 1;
+    }
+
+    .positive {
+      color: green;
+      font-weight: bold;
+    }
+
+    .negative {
+      color: red;
+      font-weight: bold;
+    }
+
+    li button {
+      background: #cc0000;
+      margin-left: 10px;
+    }
+
+    li button:hover {
+      background: #990000;
+    }
+
+    /* Toggle button */
+    #themeToggle {
+      position: absolute;
+      top: 15px;
+      right: 15px;
+      padding: 8px 12px;
+      background: #333;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    #themeToggle:hover {
+      background: #555;
+    }
+
+    /* Night mode styles */
+    body.night {
+      background: #121212;
+      color: #f4f4f9;
+    }
+
+    body.night .container {
+      background: #1e1e1e;
+      color: #f4f4f9;
+    }
+
+    body.night li {
+      background: #2a2a2a;
+      color: #f4f4f9;
+    }
+
+    body.night button {
+      background: #0077cc;
+    }
+
+    body.night #themeToggle {
+      background: #f4f4f9;
+      color: #121212;
+    }
+  </style>
+</head>
+<body>
+  <button id="themeToggle">🌙 Night Mode</button>
+
+  <div class="container">
+    <h1>My Stock Picks</h1>
+    
+    <!-- Form to add new stocks -->
+    <form id="stockForm">
+      <input type="text" id="stockName" placeholder="Enter stock symbol (e.g. AAPL)" required>
+      <button type="submit">Add Stock</button>
+    </form>
+    
+    <!-- List of stocks -->
+    <ul id="stockList"></ul>
+  </div>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const stockForm = document.getElementById("stockForm");
+      const stockList = document.getElementById("stockList");
+      const themeToggle = document.getElementById("themeToggle");
+
+      let stocks = JSON.parse(localStorage.getItem("stocks")) || [];
+
+      async function fetchStockData(symbol) {
+        const apiKey = "YOUR_API_KEY"; // replace with your Alpha Vantage key
+        const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${apiKey}`;
+        
+        try {
+          const response = await fetch(url);
+          const data = await response.json();
+          const quote = data["Global Quote"];
+          const price = quote["05. price"];
+          const changePercent = quote["10. change percent"];
+          return {
+            price: price ? `$${parseFloat(price).toFixed(2)}` : "N/A",
+            changePercent: changePercent || "N/A"
+          };
+        } catch (error) {
+          console.error("Error fetching data:", error);
+          return { price: "Error", changePercent: "Error" };
+        }
+      }
+
+      async function renderStocks() {
+        stockList.innerHTML = "";
+        for (let [index, stock] of stocks.entries()) {
+          const li = document.createElement("li");
+          const infoDiv = document.createElement("div");
+          infoDiv.className = "stock-info";
+          infoDiv.textContent = stock + " - Loading...";
+
+          // Fetch live data
+          const { price, changePercent } = await fetchStockData(stock);
+          const percentValue = parseFloat(changePercent);
+          let percentClass = "";
+          if (!isNaN(percentValue)) {
+            percentClass = percentValue >= 0 ? "positive" : "negative";
+          }
+
+          infoDiv.innerHTML = `${stock} - ${price} <span class="${percentClass}">(${changePercent})</span>`;
+
+          // Add delete button
+          const deleteBtn = document.createElement("button");
+          deleteBtn.textContent = "Remove";
+          deleteBtn.onclick = () => {
+            stocks.splice(index, 1);
+            localStorage.setItem("stocks", JSON.stringify(stocks));
+            renderStocks();
+          };
+
+          li.appendChild(infoDiv);
+          li.appendChild(deleteBtn);
+          stockList.appendChild(li);
+        }
+      }
+
+      stockForm.addEventListener("submit", (e) => {
+        e.preventDefault();
+        const stockName = document.getElementById("stockName").value.trim().toUpperCase();
+        if (stockName) {
+          stocks.push(stockName);
+          localStorage.setItem("stocks", JSON.stringify(stocks));
+          renderStocks();
+          stockForm.reset();
+        }
+      });
+
+      // Theme toggle
+      themeToggle.addEventListener("click", () => {
+        document.body.classList.toggle("night");
+        if (document.body.classList.contains("night")) {
+          themeToggle.textContent = "☀️ Day Mode";
+        } else {
+          themeToggle.textContent = "🌙 Night Mode";
+        }
+      });
+
+      renderStocks();
+    });
+  </script>
+</body>
+</html>
